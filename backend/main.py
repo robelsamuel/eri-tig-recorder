@@ -85,6 +85,92 @@ def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
+def sync_with_dropbox():
+    """Sync local state and metadata with Dropbox audio files.
+    Remove any entries from state/metadata if their audio file is missing from Dropbox."""
+    if not DROPBOX_ENABLED:
+        return
+    
+    try:
+        print("🔄 Syncing state with Dropbox audio files...")
+        
+        # Get list of audio files in Dropbox
+        dropbox_audio_files = set(dropbox_uploader.get_audio_files())
+        print(f"📁 Found {len(dropbox_audio_files)} audio files in Dropbox")
+        
+        if len(dropbox_audio_files) == 0:
+            # No audio files in Dropbox - reset everything
+            print("🗑️ No audio files in Dropbox - resetting state and metadata")
+            
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump({"recorded": []}, f, ensure_ascii=False)
+            
+            with open(METADATA_FILE, "w", encoding="utf-8") as f:
+                f.write("filename|sentence\n")
+            
+            # Upload the reset files to Dropbox
+            dropbox_uploader.upload_file(STATE_FILE)
+            dropbox_uploader.upload_file(METADATA_FILE)
+            
+            print("✅ State and metadata reset and synced to Dropbox")
+            return
+        
+        # Read current metadata
+        metadata_lines = []
+        metadata_changed = False
+        sentences_in_metadata = set()
+        
+        if os.path.exists(METADATA_FILE):
+            with open(METADATA_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                # Keep header
+                metadata_lines.append(lines[0] if lines else "filename|sentence\n")
+                
+                # Check each metadata entry
+                for line in lines[1:]:
+                    if '|' in line:
+                        filepath, sentence = line.strip().split('|', 1)
+                        filename = os.path.basename(filepath)
+                        
+                        # Only keep if audio file exists in Dropbox
+                        if filename in dropbox_audio_files:
+                            metadata_lines.append(line)
+                            sentences_in_metadata.add(sentence)
+                        else:
+                            metadata_changed = True
+                            print(f"🗑️ Removed from metadata: {filename} (missing in Dropbox)")
+        
+        # Update metadata file if changed
+        if metadata_changed or not os.path.exists(METADATA_FILE):
+            with open(METADATA_FILE, "w", encoding="utf-8") as f:
+                f.writelines(metadata_lines)
+            print("✅ Updated metadata.csv")
+            
+            # Upload updated metadata to Dropbox
+            dropbox_uploader.upload_file(METADATA_FILE)
+            print("✅ Uploaded updated metadata.csv to Dropbox")
+        
+        # Update state file - only keep sentences that have audio files
+        state = load_state()
+        original_recorded = set(state.get("recorded", []))
+        synced_recorded = list(sentences_in_metadata)
+        
+        if set(synced_recorded) != original_recorded:
+            state["recorded"] = synced_recorded
+            save_state(state)
+            
+            removed_count = len(original_recorded) - len(synced_recorded)
+            print(f"✅ Updated state: removed {removed_count} entries without audio files")
+            
+            # Upload updated state to Dropbox
+            dropbox_uploader.upload_file(STATE_FILE)
+            print("✅ Uploaded updated sentence_state.json to Dropbox")
+        
+        print(f"✅ Sync complete: {len(synced_recorded)} recordings tracked")
+        
+    except Exception as e:
+        print(f"⚠️ Error during sync: {e}")
+
 # Global Google Drive uploader instance
 drive_uploader = None
 if GOOGLE_DRIVE_ENABLED and os.path.exists('credentials.json'):
@@ -103,16 +189,52 @@ async def startup_event():
     if DROPBOX_ENABLED:
         print("🔄 Syncing state from Dropbox...")
         
-        # Try to download sentence_state.json
-        if dropbox_uploader.download_file("sentence_state.json", STATE_FILE):
-            print("✅ Restored sentence_state.json from Dropbox")
+        # Check if state files exist in Dropbox
+        state_exists = dropbox_uploader.file_exists("sentence_state.json")
+        metadata_exists = dropbox_uploader.file_exists("metadata.csv")
         
-        # Try to download metadata.csv
-        if dropbox_uploader.download_file("metadata.csv", METADATA_FILE):
-            print("✅ Restored metadata.csv from Dropbox")
-    
-    # Initialize state if files don't exist
-    init_state()
+        if not state_exists and not metadata_exists:
+            # Both files missing from Dropbox - user deleted everything, so reset
+            print("🔄 No state files found in Dropbox - resetting to fresh state")
+            
+            # Delete local files if they exist
+            if os.path.exists(STATE_FILE):
+                os.remove(STATE_FILE)
+            if os.path.exists(METADATA_FILE):
+                os.remove(METADATA_FILE)
+            
+            # Initialize fresh state
+            init_state()
+            print("✅ Reset to fresh state")
+        else:
+            # Try to download sentence_state.json
+            state_downloaded = dropbox_uploader.download_file("sentence_state.json", STATE_FILE)
+            if state_downloaded:
+                print("✅ Restored sentence_state.json from Dropbox")
+            elif state_downloaded is False:
+                # File doesn't exist in Dropbox, reset it
+                print("⚠️ sentence_state.json not in Dropbox - creating fresh")
+                if os.path.exists(STATE_FILE):
+                    os.remove(STATE_FILE)
+            
+            # Try to download metadata.csv
+            metadata_downloaded = dropbox_uploader.download_file("metadata.csv", METADATA_FILE)
+            if metadata_downloaded:
+                print("✅ Restored metadata.csv from Dropbox")
+            elif metadata_downloaded is False:
+                # File doesn't exist in Dropbox, reset it
+                print("⚠️ metadata.csv not in Dropbox - creating fresh")
+                if os.path.exists(METADATA_FILE):
+                    os.remove(METADATA_FILE)
+            
+            # Initialize state if files don't exist
+            init_state()
+            
+            # Now sync with actual audio files in Dropbox
+            sync_with_dropbox()
+    else:
+        # Initialize state if files don't exist
+        init_state()
     
     # Log current stats
     try:

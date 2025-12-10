@@ -58,9 +58,9 @@ class DropboxUploader:
             return False
     
     def download_file(self, dropbox_filename, local_file_path):
-        """Download a file from Dropbox"""
+        """Download a file from Dropbox. Returns True if downloaded, False if file doesn't exist or error."""
         if not self.dbx:
-            return False
+            return None  # Dropbox not configured
         
         try:
             dropbox_path = f"{self.folder_path}/{dropbox_filename}"
@@ -78,12 +78,45 @@ class DropboxUploader:
         except ApiError as e:
             if e.error.is_path() and e.error.get_path().is_not_found():
                 print(f"⚠️ File not found in Dropbox: {dropbox_filename}")
+                return False  # File doesn't exist
             else:
                 print(f"❌ Dropbox download failed for {dropbox_filename}: {e}")
-            return False
+                return None  # Error occurred
         except Exception as e:
             print(f"❌ Error downloading {dropbox_filename}: {e}")
+            return None  # Error occurred
+    
+    def file_exists(self, dropbox_filename):
+        """Check if a file exists in Dropbox"""
+        if not self.dbx:
             return False
+        
+        try:
+            dropbox_path = f"{self.folder_path}/{dropbox_filename}"
+            self.dbx.files_get_metadata(dropbox_path)
+            return True
+        except ApiError as e:
+            if e.error.is_path():
+                return False
+            raise
+        except Exception:
+            return False
+    
+    def get_audio_files(self):
+        """Get list of all audio files (.wav) in Dropbox folder"""
+        if not self.dbx:
+            return []
+        
+        try:
+            result = self.dbx.files_list_folder(self.folder_path)
+            audio_files = [
+                entry.name for entry in result.entries 
+                if isinstance(entry, dropbox.files.FileMetadata) and entry.name.endswith('.wav')
+            ]
+            return audio_files
+        except Exception as e:
+            print(f"❌ Error listing audio files: {e}")
+            return []
     
     def upload_directory(self, directory_path):
         """Upload all files from a directory"""
