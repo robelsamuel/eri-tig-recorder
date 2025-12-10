@@ -7,6 +7,15 @@ __pycache__/
 env/
 venv/
 
+# Environment variables and secrets (NEVER commit these!)
+.env
+backend/.env
+*.env
+backend/credentials.json
+backend/token.json
+backend/token.pickle
+backend/drive_credentials.txt
+
 # Google Drive credentials (NEVER commit these!)
 backend/credentials.json
 backend/token.json
