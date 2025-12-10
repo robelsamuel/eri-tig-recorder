@@ -100,8 +100,11 @@ async function loadNextSentence() {
 // Start recording
 async function startRecording() {
     try {
+        console.log('🎙️ Starting recording...');
+        
         // Request microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('✅ Microphone access granted');
         
         // Determine best audio format supported by browser
         const mimeTypes = [
@@ -119,15 +122,25 @@ async function startRecording() {
         audioChunks = [];
         
         mediaRecorder.ondataavailable = (event) => {
+            console.log('📦 Audio data received:', event.data.size, 'bytes');
             audioChunks.push(event.data);
         };
         
         mediaRecorder.onstop = () => {
             console.log('=== MediaRecorder stopped ===');
+            console.log('Total audio chunks:', audioChunks.length);
             
             // Create blob from chunks with the correct MIME type
             recordedBlob = new Blob(audioChunks, { type: recordingMimeType });
             console.log('Blob created:', recordedBlob.size, 'bytes');
+            
+            if (recordedBlob.size === 0) {
+                console.error('❌ Recording is empty!');
+                showStatus('Recording failed - no audio captured. Please try again.', 'error');
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                return;
+            }
             
             // Create URL for playback
             const audioUrl = URL.createObjectURL(recordedBlob);
@@ -144,6 +157,7 @@ async function startRecording() {
                 audioPlaybackSection.style.opacity = '1';
                 audioPlayer.style.display = 'block';
                 
+                console.log('✅ Audio player displayed');
                 console.log('Audio section display:', audioPlaybackSection.style.display);
                 console.log('Audio player display:', audioPlayer.style.display);
                 console.log('Audio player src:', audioPlayer.src);
@@ -163,26 +177,34 @@ async function startRecording() {
         
         // Start recording
         mediaRecorder.start();
+        console.log('🔴 Recording started, state:', mediaRecorder.state);
         
         // Update UI
         recordBtn.disabled = true;
         stopBtn.disabled = false;
         submitBtn.disabled = true;
         skipBtn.disabled = true;
-        audioPlayer.style.display = 'none';
+        audioPlaybackSection.style.display = 'none';
         
         document.querySelector('.sentence-display').classList.add('recording');
         showStatus('🔴 Recording... Speak clearly!', 'recording');
         
     } catch (error) {
-        console.error('Error starting recording:', error);
-        showStatus('Error: Could not access microphone. Please allow microphone access.', 'error');
+        console.error('❌ Error starting recording:', error);
+        if (error.name === 'NotAllowedError') {
+            showStatus('Error: Microphone access denied. Please allow microphone access and try again.', 'error');
+        } else if (error.name === 'NotFoundError') {
+            showStatus('Error: No microphone found. Please connect a microphone and try again.', 'error');
+        } else {
+            showStatus('Error: Could not access microphone. ' + error.message, 'error');
+        }
     }
 }
 
 // Stop recording
 function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        console.log('⏹️ Stopping recording...');
         mediaRecorder.stop();
         
         // Update UI
@@ -190,22 +212,23 @@ function stopRecording() {
         stopBtn.disabled = true;
         skipBtn.disabled = false;
         
-        // Show audio playback section
-        audioPlaybackSection.style.display = 'block';
-        
         document.querySelector('.sentence-display').classList.remove('recording');
         showStatus('✅ Recording stopped! Listen and submit if good, or record again.', 'success');
+    } else {
+        console.warn('⚠️ MediaRecorder not active, state:', mediaRecorder ? mediaRecorder.state : 'null');
     }
 }
 
 // Submit recording
 async function submitRecording() {
     if (!recordedBlob || !currentSentence) {
+        console.error('❌ No recording or sentence to submit');
         showStatus('No recording to submit', 'error');
         return;
     }
     
     try {
+        console.log('📤 Submitting recording...', recordedBlob.size, 'bytes');
         showStatus('Uploading recording...', 'recording');
         submitBtn.disabled = true;
         
@@ -214,15 +237,20 @@ async function submitRecording() {
         formData.append('audio', recordedBlob, 'recording.wav');
         formData.append('sentence', currentSentence);
         
+        console.log('Uploading to:', `${API_BASE_URL}/submit_recording`);
+        
         // Submit to backend
         const response = await fetch(`${API_BASE_URL}/submit_recording`, {
             method: 'POST',
             body: formData
         });
         
+        console.log('Response status:', response.status);
         const result = await response.json();
+        console.log('Response data:', result);
         
         if (result.success) {
+            console.log('✅ Recording saved successfully!');
             showStatus('✅ Recording saved successfully!', 'success');
             
             // Wait a moment, then load next sentence
@@ -230,12 +258,13 @@ async function submitRecording() {
                 loadNextSentence();
             }, 1500);
         } else {
+            console.error('❌ Server returned error:', result);
             showStatus('Error saving recording', 'error');
             submitBtn.disabled = false;
         }
         
     } catch (error) {
-        console.error('Error submitting recording:', error);
+        console.error('❌ Error submitting recording:', error);
         showStatus('Error submitting recording. Please try again.', 'error');
         submitBtn.disabled = false;
     }
