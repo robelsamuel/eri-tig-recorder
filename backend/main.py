@@ -25,6 +25,18 @@ except ImportError:
     GOOGLE_DRIVE_ENABLED = False
     print("⚠️ Google Drive integration not available. Install dependencies to enable.")
 
+# Import Dropbox helper (optional)
+try:
+    from dropbox_helper import DropboxUploader
+    dropbox_uploader = DropboxUploader()
+    DROPBOX_ENABLED = dropbox_uploader.dbx is not None
+    if DROPBOX_ENABLED:
+        print("✅ Dropbox backup enabled")
+except ImportError:
+    DROPBOX_ENABLED = False
+    dropbox_uploader = None
+    print("⚠️ Dropbox integration not available")
+
 app = FastAPI()
 
 # Enable CORS for frontend communication
@@ -208,6 +220,14 @@ async def submit_recording(
                 print(f"✅ Uploaded {filename} to Google Drive")
             except Exception as e:
                 print(f"⚠️ Failed to upload {filename} to Google Drive: {e}")
+        
+        # Optional: Upload to Dropbox
+        if DROPBOX_ENABLED:
+            try:
+                dropbox_uploader.upload_file(filepath)
+                print(f"✅ Uploaded {filename} to Dropbox")
+            except Exception as e:
+                print(f"⚠️ Failed to upload {filename} to Dropbox: {e}")
         
         return {
             "success": True,
