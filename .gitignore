@@ -27,6 +27,7 @@ backend/clips/*.webm
 backend/clips/*.ogg
 backend/sentence_state.json
 backend/metadata.csv
+backend/clips/
 
 # IDE
 .vscode/
