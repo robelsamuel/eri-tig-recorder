@@ -137,14 +137,20 @@ async function startRecording() {
             audioPlayer.src = audioUrl;
             audioPlayer.load();
             
-            // FORCE SHOW - Multiple methods to ensure visibility
-            audioPlaybackSection.style.display = 'block';
-            audioPlaybackSection.style.visibility = 'visible';
-            audioPlayer.style.display = 'block';
-            
-            console.log('Audio section display:', audioPlaybackSection.style.display);
-            console.log('Audio player display:', audioPlayer.style.display);
-            console.log('Audio player src:', audioPlayer.src);
+            // FORCE SHOW - Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                audioPlaybackSection.style.display = 'block';
+                audioPlaybackSection.style.visibility = 'visible';
+                audioPlaybackSection.style.opacity = '1';
+                audioPlayer.style.display = 'block';
+                
+                console.log('Audio section display:', audioPlaybackSection.style.display);
+                console.log('Audio player display:', audioPlayer.style.display);
+                console.log('Audio player src:', audioPlayer.src);
+                
+                // Scroll to the audio player so user can see it
+                audioPlaybackSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
             
             // Enable submit button
             submitBtn.disabled = false;
