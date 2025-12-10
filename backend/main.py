@@ -99,7 +99,28 @@ if GOOGLE_DRIVE_ENABLED and os.path.exists('credentials.json'):
 
 @app.on_event("startup")
 async def startup_event():
+    # First, try to restore state from Dropbox if available
+    if DROPBOX_ENABLED:
+        print("🔄 Syncing state from Dropbox...")
+        
+        # Try to download sentence_state.json
+        if dropbox_uploader.download_file("sentence_state.json", STATE_FILE):
+            print("✅ Restored sentence_state.json from Dropbox")
+        
+        # Try to download metadata.csv
+        if dropbox_uploader.download_file("metadata.csv", METADATA_FILE):
+            print("✅ Restored metadata.csv from Dropbox")
+    
+    # Initialize state if files don't exist
     init_state()
+    
+    # Log current stats
+    try:
+        state = load_state()
+        recorded_count = len(state.get("recorded", []))
+        print(f"📊 Current progress: {recorded_count} sentences recorded")
+    except Exception as e:
+        print(f"⚠️ Error loading state: {e}")
 
 @app.get("/")
 async def root():
@@ -226,8 +247,16 @@ async def submit_recording(
             try:
                 dropbox_uploader.upload_file(filepath)
                 print(f"✅ Uploaded {filename} to Dropbox")
+                
+                # Also upload the updated metadata.csv
+                dropbox_uploader.upload_file(METADATA_FILE)
+                print(f"✅ Uploaded metadata.csv to Dropbox")
+                
+                # Also upload the updated sentence_state.json
+                dropbox_uploader.upload_file(STATE_FILE)
+                print(f"✅ Uploaded sentence_state.json to Dropbox")
             except Exception as e:
-                print(f"⚠️ Failed to upload {filename} to Dropbox: {e}")
+                print(f"⚠️ Failed to upload to Dropbox: {e}")
         
         return {
             "success": True,

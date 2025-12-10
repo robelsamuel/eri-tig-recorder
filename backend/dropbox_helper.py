@@ -57,6 +57,34 @@ class DropboxUploader:
             print(f"❌ Error uploading {local_file_path}: {e}")
             return False
     
+    def download_file(self, dropbox_filename, local_file_path):
+        """Download a file from Dropbox"""
+        if not self.dbx:
+            return False
+        
+        try:
+            dropbox_path = f"{self.folder_path}/{dropbox_filename}"
+            
+            # Download file
+            metadata, res = self.dbx.files_download(dropbox_path)
+            
+            # Save to local file
+            with open(local_file_path, 'wb') as f:
+                f.write(res.content)
+            
+            print(f"✅ Downloaded from Dropbox: {dropbox_filename}")
+            return True
+            
+        except ApiError as e:
+            if e.error.is_path() and e.error.get_path().is_not_found():
+                print(f"⚠️ File not found in Dropbox: {dropbox_filename}")
+            else:
+                print(f"❌ Dropbox download failed for {dropbox_filename}: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Error downloading {dropbox_filename}: {e}")
+            return False
+    
     def upload_directory(self, directory_path):
         """Upload all files from a directory"""
         if not os.path.exists(directory_path):
