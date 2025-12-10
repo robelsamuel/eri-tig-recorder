@@ -34,6 +34,25 @@
             </div>
         </div>
 
+        <!-- Personal Stats (shown when speaker name is set) -->
+        <div class="personal-stats-container" id="personalStatsContainer" style="display: none; margin: 20px auto; max-width: 600px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h3 style="color: white; margin-bottom: 15px; text-align: center; font-size: 1.2rem;">🎯 Your Personal Stats</h3>
+            <div style="display: flex; justify-content: space-around; align-items: center;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2.5rem; font-weight: bold; color: #fbbf24;" id="personalCount">0</div>
+                    <div style="color: #e0e7ff; font-size: 0.9rem; margin-top: 5px;">Your Recordings</div>
+                </div>
+                <div style="text-align: center; padding: 0 20px; border-left: 2px solid rgba(255,255,255,0.3); border-right: 2px solid rgba(255,255,255,0.3);">
+                    <div style="font-size: 2.5rem; font-weight: bold; color: #34d399;" id="personalPercentage">0%</div>
+                    <div style="color: #e0e7ff; font-size: 0.9rem; margin-top: 5px;">Your Contribution</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 1.2rem; font-weight: bold; color: #fca5a5;" id="speakerRank">-</div>
+                    <div style="color: #e0e7ff; font-size: 0.9rem; margin-top: 5px;">Your Rank</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Progress Bar -->
         <div class="progress-bar-container">
             <div class="progress-bar" id="progressBar"></div>
@@ -41,6 +60,30 @@
 
         <!-- Main Recording Card -->
         <div class="recording-card" id="recordingCard">
+            <!-- Speaker Name Section -->
+            <div class="speaker-name-section" id="speakerNameSection" style="margin-bottom: 20px; padding: 20px; background: #f0fdf4; border-radius: 8px; border: 2px solid #22c55e;">
+                <h3 style="color: #15803d; margin-bottom: 10px; font-size: 1.1rem;">👤 Speaker Information:</h3>
+                <p style="color: #15803d; font-size: 0.85rem; margin-bottom: 10px;">
+                    ⚠️ Choose a <strong>unique personal name</strong> (e.g., Robel, Sara_M, John_123)
+                    <br>• No spaces or hyphens allowed • Only letters, numbers, and underscores
+                    <br>🔄 <strong>Returning contributor?</strong> Enter your existing name to resume your work!
+                </p>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input 
+                        type="text" 
+                        id="speakerNameInput" 
+                        placeholder="Enter your name (new or existing)" 
+                        style="flex: 1; padding: 10px; border: 2px solid #86efac; border-radius: 6px; font-size: 1rem;"
+                        maxlength="30"
+                    />
+                    <button id="saveNameBtn" class="btn" style="background: #22c55e; color: white; padding: 10px 20px;">Continue</button>
+                </div>
+                <p id="currentSpeakerName" style="margin-top: 10px; color: #15803d; font-weight: bold; display: none;">
+                    Recording as: <span id="speakerNameDisplay"></span>
+                    <button id="changeNameBtn" style="margin-left: 10px; padding: 5px 10px; background: transparent; border: 1px solid #15803d; border-radius: 4px; color: #15803d; cursor: pointer;">Change</button>
+                </p>
+            </div>
+
             <!-- Sentence Display -->
             <div class="sentence-display" id="sentenceDisplay">
                 <p class="sentence-text" id="sentenceText">Loading...</p>

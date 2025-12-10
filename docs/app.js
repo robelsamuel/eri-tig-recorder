@@ -16,6 +16,7 @@ let audioChunks = [];
 let currentSentence = null;
 let recordedBlob = null;
 let recordingMimeType = 'audio/webm'; // Store the actual mime type used
+let speakerName = null; // Store speaker name
 
 // DOM Elements
 const sentenceText = document.getElementById('sentenceText');
@@ -36,8 +37,22 @@ const remainingCount = document.getElementById('remainingCount');
 const progressPercent = document.getElementById('progressPercent');
 const progressBar = document.getElementById('progressBar');
 
+// Personal stats elements
+const personalStatsContainer = document.getElementById('personalStatsContainer');
+const personalCount = document.getElementById('personalCount');
+const personalPercentage = document.getElementById('personalPercentage');
+const speakerRank = document.getElementById('speakerRank');
+
+// Speaker name elements
+const speakerNameInput = document.getElementById('speakerNameInput');
+const saveNameBtn = document.getElementById('saveNameBtn');
+const currentSpeakerName = document.getElementById('currentSpeakerName');
+const speakerNameDisplay = document.getElementById('speakerNameDisplay');
+const changeNameBtn = document.getElementById('changeNameBtn');
+
 // Initialize app
 async function init() {
+    loadSpeakerName();
     await loadStats();
     await loadNextSentence();
     setupEventListeners();
@@ -49,6 +64,8 @@ function setupEventListeners() {
     stopBtn.addEventListener('click', stopRecording);
     submitBtn.addEventListener('click', submitRecording);
     skipBtn.addEventListener('click', loadNextSentence);
+    saveNameBtn.addEventListener('click', saveSpeakerName);
+    changeNameBtn.addEventListener('click', enableNameEditing);
 }
 
 // Load statistics
@@ -62,9 +79,64 @@ async function loadStats() {
         remainingCount.textContent = stats.remaining_count;
         progressPercent.textContent = `${stats.progress_percent}%`;
         progressBar.style.width = `${stats.progress_percent}%`;
+        
+        // Load personal stats if speaker name is set
+        if (speakerName) {
+            await loadPersonalStats();
+        }
     } catch (error) {
         console.error('Error loading stats:', error);
         showStatus('Error loading statistics', 'error');
+    }
+}
+
+// Load personal statistics for the current speaker
+async function loadPersonalStats() {
+    if (!speakerName) {
+        personalStatsContainer.style.display = 'none';
+        return;
+    }
+    
+    try {
+        // Get speaker's personal stats
+        const response = await fetch(`${API_BASE_URL}/speaker_stats/${encodeURIComponent(speakerName)}`);
+        const speakerStats = await response.json();
+        
+        // Get all speakers for ranking
+        const allSpeakersResponse = await fetch(`${API_BASE_URL}/all_speakers`);
+        const allSpeakersData = await allSpeakersResponse.json();
+        
+        // Get global stats for percentage calculation
+        const globalResponse = await fetch(`${API_BASE_URL}/stats`);
+        const globalStats = await globalResponse.json();
+        
+        // Update personal count
+        personalCount.textContent = speakerStats.recording_count;
+        
+        // Calculate and display percentage contribution
+        const percentage = globalStats.recorded_count > 0 
+            ? ((speakerStats.recording_count / globalStats.recorded_count) * 100).toFixed(1)
+            : 0;
+        personalPercentage.textContent = `${percentage}%`;
+        
+        // Find speaker's rank
+        const speakers = allSpeakersData.speakers || [];
+        const rank = speakers.findIndex(s => s.name === speakerName.replace(/\s/g, '_')) + 1;
+        
+        if (rank > 0) {
+            speakerRank.textContent = `#${rank} of ${speakers.length}`;
+        } else {
+            speakerRank.textContent = speakerStats.recording_count > 0 ? '#1' : '-';
+        }
+        
+        // Show the personal stats container
+        personalStatsContainer.style.display = 'block';
+        
+        console.log('✅ Personal stats loaded:', speakerStats);
+    } catch (error) {
+        console.error('Error loading personal stats:', error);
+        // Don't show error to user, just hide the stats
+        personalStatsContainer.style.display = 'none';
     }
 }
 
@@ -236,6 +308,7 @@ async function submitRecording() {
         const formData = new FormData();
         formData.append('audio', recordedBlob, 'recording.wav');
         formData.append('sentence', currentSentence);
+        formData.append('speaker', speakerName);
         
         console.log('Uploading to:', `${API_BASE_URL}/submit_recording`);
         
@@ -298,6 +371,133 @@ function hideStatus() {
 function showCompletionScreen() {
     recordingCard.style.display = 'none';
     completionCard.style.display = 'block';
+}
+
+// Load speaker name from localStorage
+function loadSpeakerName() {
+    const savedName = localStorage.getItem('speakerName');
+    if (savedName) {
+        speakerName = savedName;
+        speakerNameDisplay.textContent = savedName;
+        currentSpeakerName.style.display = 'block';
+        speakerNameInput.style.display = 'none';
+        saveNameBtn.style.display = 'none';
+        
+        // Load personal stats for the saved speaker
+        loadPersonalStats();
+    } else {
+        currentSpeakerName.style.display = 'none';
+        speakerNameInput.style.display = 'block';
+        saveNameBtn.style.display = 'block';
+        personalStatsContainer.style.display = 'none';
+    }
+}
+
+// Save speaker name to localStorage
+async function saveSpeakerName() {
+    const name = speakerNameInput.value.trim();
+    
+    if (!name) {
+        showStatus('Please enter a valid name.', 'error');
+        return;
+    }
+    
+    // Validate format: no spaces, hyphens, or special characters
+    const hasSpaces = /\s/.test(name);
+    const hasHyphens = /-/.test(name);
+    const hasSpecialChars = /[^a-zA-Z0-9_]/.test(name);
+    
+    if (hasSpaces) {
+        showStatus('❌ Name cannot contain spaces. Use underscores instead (e.g., "John_Doe")', 'error');
+        return;
+    }
+    
+    if (hasHyphens) {
+        showStatus('❌ Name cannot contain hyphens. Use underscores instead (e.g., "John_Doe")', 'error');
+        return;
+    }
+    
+    if (hasSpecialChars) {
+        showStatus('❌ Name can only contain letters, numbers, and underscores (e.g., "Robel_123")', 'error');
+        return;
+    }
+    
+    // Check for minimum length
+    if (name.length < 2) {
+        showStatus('❌ Name must be at least 2 characters long', 'error');
+        return;
+    }
+    
+    // Check if name is already taken by another speaker
+    try {
+        const response = await fetch(`${API_BASE_URL}/all_speakers`);
+        const data = await response.json();
+        const existingSpeakers = data.speakers || [];
+        
+        // Check if this exact name already exists (case-insensitive)
+        const existingSpeaker = existingSpeakers.find(speaker => 
+            speaker.name.toLowerCase() === name.toLowerCase()
+        );
+        
+        if (existingSpeaker && existingSpeaker.count > 0) {
+            // Name exists - this is a returning contributor!
+            const confirmResume = confirm(
+                `Welcome back! 🎉\n\n` +
+                `The name "${name}" already has ${existingSpeaker.count} recording(s).\n\n` +
+                `Click OK if this is you and you want to continue recording.\n` +
+                `Click Cancel if this is NOT you (choose a different name).`
+            );
+            
+            if (!confirmResume) {
+                showStatus(`❌ Name "${name}" is taken. Please choose a different name.`, 'error');
+                return;
+            }
+            
+            // User confirmed - they are resuming their work
+            console.log(`✅ Returning contributor: ${name} (${existingSpeaker.count} recordings)`);
+            showStatus(`🎉 Welcome back, ${name}! You have ${existingSpeaker.count} recording(s).`, 'success');
+        } else {
+            // New contributor
+            console.log(`✅ New contributor: ${name}`);
+            showStatus(`✅ Welcome, ${name}! Let's start recording.`, 'success');
+        }
+        
+        // Save name and proceed
+        speakerName = name;
+        localStorage.setItem('speakerName', speakerName);
+        speakerNameDisplay.textContent = speakerName;
+        currentSpeakerName.style.display = 'block';
+        speakerNameInput.style.display = 'none';
+        saveNameBtn.style.display = 'none';
+        
+        // Load personal stats after setting name
+        await loadPersonalStats();
+        
+        setTimeout(hideStatus, 3000);
+        
+    } catch (error) {
+        console.error('Error checking speaker names:', error);
+        // If we can't check uniqueness, still allow the name (offline mode)
+        speakerName = name;
+        localStorage.setItem('speakerName', speakerName);
+        speakerNameDisplay.textContent = speakerName;
+        currentSpeakerName.style.display = 'block';
+        speakerNameInput.style.display = 'none';
+        saveNameBtn.style.display = 'none';
+        showStatus(`✅ Recording as: ${speakerName}`, 'success');
+        
+        await loadPersonalStats();
+        setTimeout(hideStatus, 2000);
+    }
+}
+
+// Enable editing of speaker name
+function enableNameEditing() {
+    speakerNameInput.value = speakerName;
+    currentSpeakerName.style.display = 'none';
+    speakerNameInput.style.display = 'block';
+    saveNameBtn.style.display = 'block';
+    speakerNameInput.focus();
 }
 
 // Initialize app when DOM is ready

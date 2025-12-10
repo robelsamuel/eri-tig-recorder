@@ -262,6 +262,84 @@ async def get_stats():
         "progress_percent": round((len(recorded) / len(sentences) * 100), 2) if sentences else 0
     }
 
+@app.get("/speaker_stats/{speaker_name}")
+async def get_speaker_stats(speaker_name: str):
+    """Get statistics for a specific speaker by counting their recordings in metadata.csv"""
+    try:
+        if not os.path.exists(METADATA_FILE):
+            return {
+                "speaker": speaker_name,
+                "recording_count": 0,
+                "recordings": []
+            }
+        
+        # Sanitize speaker name the same way as in filename generation
+        sanitized_speaker = ''.join(c if c.isalnum() or c == '_' else '_' for c in speaker_name)
+        sanitized_speaker = sanitized_speaker.strip('_')
+        
+        speaker_recordings = []
+        
+        # Read metadata.csv and count files that start with the speaker's name
+        with open(METADATA_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()[1:]  # Skip header
+            for line in lines:
+                if '|' in line:
+                    filepath, sentence = line.strip().split('|', 1)
+                    filename = os.path.basename(filepath)
+                    
+                    # Check if filename starts with speaker's sanitized name
+                    if filename.startswith(f"{sanitized_speaker}_"):
+                        speaker_recordings.append({
+                            "filename": filename,
+                            "sentence": sentence[:50] + "..." if len(sentence) > 50 else sentence
+                        })
+        
+        return {
+            "speaker": speaker_name,
+            "recording_count": len(speaker_recordings),
+            "recordings": speaker_recordings
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting speaker stats: {str(e)}")
+
+@app.get("/all_speakers")
+async def get_all_speakers():
+    """Get a list of all speakers and their recording counts"""
+    try:
+        if not os.path.exists(METADATA_FILE):
+            return {"speakers": []}
+        
+        speaker_counts = {}
+        
+        # Read metadata.csv and extract speaker names from filenames
+        with open(METADATA_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()[1:]  # Skip header
+            for line in lines:
+                if '|' in line:
+                    filepath, _ = line.strip().split('|', 1)
+                    filename = os.path.basename(filepath)
+                    
+                    # Extract speaker name from filename (format: speaker_num_timestamp_id.wav)
+                    if '_' in filename:
+                        parts = filename.split('_')
+                        # Check if it has speaker prefix (at least 4 parts: speaker, num, timestamp, id)
+                        if len(parts) >= 4:
+                            speaker_name = parts[0]
+                            speaker_counts[speaker_name] = speaker_counts.get(speaker_name, 0) + 1
+        
+        # Convert to list and sort by count (descending)
+        speakers_list = [
+            {"name": name, "count": count}
+            for name, count in speaker_counts.items()
+        ]
+        speakers_list.sort(key=lambda x: x["count"], reverse=True)
+        
+        return {"speakers": speakers_list}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting all speakers: {str(e)}")
+
 @app.get("/next_sentence")
 async def get_next_sentence():
     """Get the next unrecorded sentence"""
@@ -300,19 +378,52 @@ async def get_next_sentence():
 @app.post("/submit_recording")
 async def submit_recording(
     audio: UploadFile = File(...),
-    sentence: str = Form(...)
+    sentence: str = Form(...),
+    speaker: str = Form(None)
 ):
     """Save audio recording and update metadata"""
     temp_path = None
     try:
+        # Validate speaker name format (backend validation as extra safety)
+        if speaker:
+            # Check for invalid characters
+            if not all(c.isalnum() or c == '_' for c in speaker):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Invalid speaker name. Only letters, numbers, and underscores are allowed."
+                )
+            
+            # Check for minimum length
+            if len(speaker) < 2:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Speaker name must be at least 2 characters long."
+                )
+            
+            # Check for maximum length
+            if len(speaker) > 30:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Speaker name must be 30 characters or less."
+                )
+        
         # Generate unique filename
         timestamp = int(time.time())
         random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
         state = load_state()
         sentence_num = len(state.get("recorded", [])) + 1
         
-        # Always use .wav extension
-        filename = f"{sentence_num}_{timestamp}_{random_id}.wav"
+        # Sanitize speaker name for filename (remove special characters)
+        speaker_prefix = ""
+        if speaker:
+            # Remove special characters and spaces, keep only alphanumeric and underscores
+            sanitized_speaker = ''.join(c if c.isalnum() or c == '_' else '_' for c in speaker)
+            sanitized_speaker = sanitized_speaker.strip('_')  # Remove leading/trailing underscores
+            if sanitized_speaker:
+                speaker_prefix = f"{sanitized_speaker}_"
+        
+        # Always use .wav extension with speaker prefix
+        filename = f"{speaker_prefix}{sentence_num}_{timestamp}_{random_id}.wav"
         filepath = os.path.join(CLIPS_DIR, filename)
         
         # Read audio content
