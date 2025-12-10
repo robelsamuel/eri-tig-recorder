@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ti" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tigrigna Speech Collection - ምእካብ ድምጺ ትግርኛ</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🎤 Tigrigna Speech Collection</h1>
+            <p class="subtitle">Help build an open Tigrigna speech dataset</p>
+        </header>
+
+        <!-- Stats Dashboard -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-value" id="totalSentences">0</div>
+                <div class="stat-label">Total Sentences</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="recordedCount">0</div>
+                <div class="stat-label">Recorded</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="remainingCount">0</div>
+                <div class="stat-label">Remaining</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="progressPercent">0%</div>
+                <div class="stat-label">Progress</div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- Main Recording Card -->
+        <div class="recording-card" id="recordingCard">
+            <!-- Sentence Display -->
+            <div class="sentence-display" id="sentenceDisplay">
+                <p class="sentence-text" id="sentenceText">Loading...</p>
+            </div>
+
+            <!-- Recording Status -->
+            <div class="status-message" id="statusMessage"></div>
+
+            <!-- Audio Playback Section -->
+            <div id="audioPlaybackSection" style="display: none; margin: 20px 0; padding: 20px; background: #f0f9ff; border-radius: 8px; border: 2px solid #3b82f6;">
+                <h3 style="color: #1e40af; margin-bottom: 10px; font-size: 1.1rem;">🎧 Listen to Your Recording:</h3>
+                <audio id="audioPlayer" controls style="width: 100%;"></audio>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="controls">
+                <button class="btn btn-record" id="recordBtn">
+                    <span class="btn-icon">🎙️</span>
+                    <span class="btn-text">Start Recording</span>
+                </button>
+                
+                <button class="btn btn-stop" id="stopBtn" disabled>
+                    <span class="btn-icon">⏹️</span>
+                    <span class="btn-text">Stop</span>
+                </button>
+                
+                <button class="btn btn-submit" id="submitBtn" disabled>
+                    <span class="btn-icon">✅</span>
+                    <span class="btn-text">Submit</span>
+                </button>
+                
+                <button class="btn btn-skip" id="skipBtn">
+                    <span class="btn-icon">⏭️</span>
+                    <span class="btn-text">Skip</span>
+                </button>
+            </div>
+
+            <!-- Tips Section -->
+            <div class="tips">
+                <h3>📝 Recording Tips:</h3>
+                <ul>
+                    <li>Find a quiet environment</li>
+                    <li>Speak clearly and naturally</li>
+                    <li>Read the sentence as shown</li>
+                    <li>Listen to your recording before submitting</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Completion Message -->
+        <div class="completion-card" id="completionCard" style="display: none;">
+            <div class="completion-icon">🎉</div>
+            <h2>Congratulations!</h2>
+            <p>You've recorded all available sentences!</p>
+            <p class="completion-message">Thank you for contributing to the Tigrigna speech dataset.</p>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>Built for family language preservation | Open Source</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

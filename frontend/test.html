@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Audio Test</title>
+    <style>
+        body { font-family: Arial; padding: 40px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; }
+        #status { margin: 20px 0; padding: 10px; background: #e3f2fd; border-radius: 5px; }
+        #audioSection { margin: 20px 0; padding: 20px; background: #fff3cd; border: 3px solid #ff6b6b; border-radius: 8px; }
+        audio { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Simple Audio Recording Test</h1>
+        <div id="status">Status: Ready</div>
+        
+        <button id="startBtn" style="background: #4caf50; color: white;">START RECORDING</button>
+        <button id="stopBtn" style="background: #f44336; color: white;" disabled>STOP RECORDING</button>
+        
+        <div id="audioSection" style="display: none;">
+            <h2>🎧 YOUR RECORDING IS HERE:</h2>
+            <audio id="audioPlayer" controls></audio>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const audioSection = document.getElementById('audioSection');
+        const audioPlayer = document.getElementById('audioPlayer');
+        
+        startBtn.onclick = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Find supported type
+                const types = ['audio/webm', 'audio/ogg', 'audio/mp4'];
+                const mimeType = types.find(t => MediaRecorder.isTypeSupported(t));
+                
+                mediaRecorder = new MediaRecorder(stream, { mimeType });
+                audioChunks = [];
+                
+                status.textContent = '🔴 RECORDING... Type: ' + mimeType;
+                status.style.background = '#ffcdd2';
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    audioChunks.push(e.data);
+                    console.log('Data chunk received:', e.data.size, 'bytes');
+                };
+                
+                mediaRecorder.onstop = () => {
+                    console.log('MediaRecorder stopped');
+                    const blob = new Blob(audioChunks, { type: mimeType });
+                    console.log('Blob created:', blob.size, 'bytes');
+                    
+                    const url = URL.createObjectURL(blob);
+                    console.log('URL created:', url);
+                    
+                    audioPlayer.src = url;
+                    audioPlayer.load();
+                    
+                    // FORCE SHOW
+                    audioSection.style.display = 'block';
+                    audioSection.style.visibility = 'visible';
+                    
+                    status.textContent = '✅ RECORDING COMPLETE! Blob size: ' + blob.size + ' bytes';
+                    status.style.background = '#c8e6c9';
+                    
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                
+                mediaRecorder.start();
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                audioSection.style.display = 'none';
+                
+            } catch (err) {
+                status.textContent = '❌ ERROR: ' + err.message;
+                status.style.background = '#ffcdd2';
+                console.error(err);
+            }
+        };
+        
+        stopBtn.onclick = () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                console.log('Stopping recorder...');
+                mediaRecorder.stop();
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        };
+    </script>
+</body>
+</html>
