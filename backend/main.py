@@ -272,8 +272,12 @@ async def get_next_sentence():
     state = load_state()
     recorded = set(state.get("recorded", []))
     
+    print(f"📊 Total sentences: {len(sentences)}, Already recorded: {len(recorded)}")
+    
     # Find unrecorded sentences
     unrecorded = [s for s in sentences if s not in recorded]
+    
+    print(f"📋 Unrecorded sentences remaining: {len(unrecorded)}")
     
     if not unrecorded:
         return {
@@ -284,6 +288,8 @@ async def get_next_sentence():
     
     # Return a random unrecorded sentence
     sentence = random.choice(unrecorded)
+    
+    print(f"✅ Selected sentence: {sentence[:50]}...")
     
     return {
         "sentence": sentence,
