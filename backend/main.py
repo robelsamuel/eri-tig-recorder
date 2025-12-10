@@ -1,13 +1,21 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydub import AudioSegment
 import json
 import os
 import time
 import random
 import string
 import tempfile
+
+# Try to import pydub for audio conversion (optional)
+try:
+    from pydub import AudioSegment
+    AUDIO_CONVERSION_ENABLED = True
+    print("✅ Audio conversion enabled (pydub available)")
+except ImportError:
+    AUDIO_CONVERSION_ENABLED = False
+    print("⚠️ Audio conversion disabled (pydub not available - files will be saved as-is)")
 
 # Import Google Drive helper (optional)
 try:
@@ -154,23 +162,29 @@ async def submit_recording(
             temp_file.write(audio_content)
             temp_path = temp_file.name
         
-        # Try to convert from WebM format (most common browser format)
-        try:
-            audio_segment = AudioSegment.from_file(temp_path, format="webm")
-            print(f"Successfully loaded as WebM format")
-        except:
-            # Fallback: Try OGG format
+        if AUDIO_CONVERSION_ENABLED:
+            # Try to convert from WebM format (most common browser format)
             try:
-                audio_segment = AudioSegment.from_file(temp_path, format="ogg")
-                print(f"Successfully loaded as OGG format")
-            except Exception as e:
-                # Last resort: let pydub auto-detect
-                audio_segment = AudioSegment.from_file(temp_path)
-                print(f"Auto-detected format")
-        
-        # Export as proper WAV file
-        audio_segment.export(filepath, format="wav")
-        print(f"Saved as proper WAV: {filepath}")
+                audio_segment = AudioSegment.from_file(temp_path, format="webm")
+                print(f"Successfully loaded as WebM format")
+            except:
+                # Fallback: Try OGG format
+                try:
+                    audio_segment = AudioSegment.from_file(temp_path, format="ogg")
+                    print(f"Successfully loaded as OGG format")
+                except Exception as e:
+                    # Last resort: let pydub auto-detect
+                    audio_segment = AudioSegment.from_file(temp_path)
+                    print(f"Auto-detected format")
+            
+            # Export as proper WAV file
+            audio_segment.export(filepath, format="wav")
+            print(f"Saved as proper WAV: {filepath}")
+        else:
+            # Save the file as-is
+            with open(filepath, "wb") as f:
+                f.write(audio_content)
+            print(f"Saved as-is: {filepath}")
         
         # Clean up temp file
         if temp_path and os.path.exists(temp_path):
