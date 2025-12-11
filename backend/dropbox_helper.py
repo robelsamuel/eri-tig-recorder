@@ -1,12 +1,14 @@
 """
 Dropbox Helper for automatic backup of audio recordings.
 Uses your Dropbox account to store recordings permanently.
+Supports both long-lived tokens and OAuth refresh tokens.
 """
 
 import dropbox
-from dropbox.exceptions import ApiError
+from dropbox.exceptions import ApiError, AuthError
 import os
 from dotenv import load_dotenv
+import time
 
 # Load environment variables
 load_dotenv()
@@ -15,20 +17,61 @@ class DropboxUploader:
     def __init__(self):
         """Initialize Dropbox connection"""
         self.access_token = os.getenv('DROPBOX_ACCESS_TOKEN')
+        self.refresh_token = os.getenv('DROPBOX_REFRESH_TOKEN')
+        self.app_key = os.getenv('DROPBOX_APP_KEY')
+        self.app_secret = os.getenv('DROPBOX_APP_SECRET')
         self.folder_path = os.getenv('DROPBOX_FOLDER_PATH', '/tigrigna_datasets')
         self.dbx = None
         
+        # Try to initialize connection
+        self._initialize_connection()
+    
+    def _initialize_connection(self):
+        """Initialize Dropbox connection with refresh token support"""
+        # Option 1: Use refresh token (recommended)
+        if self.refresh_token and self.app_key and self.app_secret:
+            try:
+                self.dbx = dropbox.Dropbox(
+                    oauth2_refresh_token=self.refresh_token,
+                    app_key=self.app_key,
+                    app_secret=self.app_secret
+                )
+                # Test the connection
+                self.dbx.users_get_current_account()
+                print(f"✅ Connected to Dropbox with refresh token! Folder: {self.folder_path}")
+                return
+            except Exception as e:
+                print(f"❌ Dropbox refresh token connection failed: {e}")
+                self.dbx = None
+        
+        # Option 2: Use access token (will expire)
         if self.access_token:
             try:
                 self.dbx = dropbox.Dropbox(self.access_token)
                 # Test the connection
                 self.dbx.users_get_current_account()
-                print(f"✅ Connected to Dropbox! Folder: {self.folder_path}")
+                print(f"✅ Connected to Dropbox with access token! Folder: {self.folder_path}")
+                print("⚠️  WARNING: Using short-lived access token. Use refresh token for production.")
+            except AuthError as e:
+                print(f"❌ Dropbox access token expired or invalid: {e}")
+                print("💡 Generate a new token or use refresh token instead")
+                self.dbx = None
             except Exception as e:
                 print(f"❌ Dropbox connection failed: {e}")
                 self.dbx = None
         else:
-            print("⚠️ Dropbox token not found in .env file")
+            print("⚠️ Dropbox credentials not found in .env file")
+    
+    def _retry_on_auth_error(self, func, *args, **kwargs):
+        """Retry operation if auth error occurs (token might have expired)"""
+        try:
+            return func(*args, **kwargs)
+        except AuthError as e:
+            print(f"⚠️ Auth error, attempting to reconnect: {e}")
+            self._initialize_connection()
+            if self.dbx:
+                return func(*args, **kwargs)
+            raise
     
     def upload_file(self, local_file_path):
         """Upload a file to Dropbox"""
@@ -40,8 +83,9 @@ class DropboxUploader:
             dropbox_path = f"{self.folder_path}/{file_name}"
             
             with open(local_file_path, 'rb') as f:
-                # Upload file
-                self.dbx.files_upload(
+                # Upload file with retry on auth error
+                self._retry_on_auth_error(
+                    self.dbx.files_upload,
                     f.read(),
                     dropbox_path,
                     mode=dropbox.files.WriteMode.overwrite
@@ -65,8 +109,11 @@ class DropboxUploader:
         try:
             dropbox_path = f"{self.folder_path}/{dropbox_filename}"
             
-            # Download file
-            metadata, res = self.dbx.files_download(dropbox_path)
+            # Download file with retry on auth error
+            metadata, res = self._retry_on_auth_error(
+                self.dbx.files_download,
+                dropbox_path
+            )
             
             # Save to local file
             with open(local_file_path, 'wb') as f:
@@ -93,7 +140,10 @@ class DropboxUploader:
         
         try:
             dropbox_path = f"{self.folder_path}/{dropbox_filename}"
-            self.dbx.files_get_metadata(dropbox_path)
+            self._retry_on_auth_error(
+                self.dbx.files_get_metadata,
+                dropbox_path
+            )
             return True
         except ApiError as e:
             if e.error.is_path():
@@ -111,7 +161,10 @@ class DropboxUploader:
             return []
         
         try:
-            result = self.dbx.files_list_folder(self.folder_path)
+            result = self._retry_on_auth_error(
+                self.dbx.files_list_folder,
+                self.folder_path
+            )
             audio_files = [
                 entry.name for entry in result.entries 
                 if isinstance(entry, dropbox.files.FileMetadata) and entry.name.endswith('.wav')
@@ -144,7 +197,10 @@ class DropboxUploader:
             return []
         
         try:
-            result = self.dbx.files_list_folder(self.folder_path)
+            result = self._retry_on_auth_error(
+                self.dbx.files_list_folder,
+                self.folder_path
+            )
             files = [entry.name for entry in result.entries]
             return files
         except Exception as e:
