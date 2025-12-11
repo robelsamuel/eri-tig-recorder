@@ -85,6 +85,39 @@ def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
+# Count total recordings from metadata.csv (source of truth)
+def count_total_recordings():
+    """Count total number of recordings from metadata.csv"""
+    if not os.path.exists(METADATA_FILE):
+        return 0
+    
+    try:
+        with open(METADATA_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()[1:]  # Skip header
+            return len([line for line in lines if line.strip() and '|' in line])
+    except Exception as e:
+        print(f"⚠️ Error counting recordings: {e}")
+        return 0
+
+# Count unique sentences recorded from metadata.csv
+def count_unique_sentences_recorded():
+    """Count unique sentences that have been recorded from metadata.csv"""
+    if not os.path.exists(METADATA_FILE):
+        return set()
+    
+    try:
+        unique_sentences = set()
+        with open(METADATA_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()[1:]  # Skip header
+            for line in lines:
+                if line.strip() and '|' in line:
+                    _, sentence = line.strip().split('|', 1)
+                    unique_sentences.add(sentence)
+        return unique_sentences
+    except Exception as e:
+        print(f"⚠️ Error counting unique sentences: {e}")
+        return set()
+
 def sync_with_dropbox():
     """Sync local state and metadata with Dropbox audio files.
     Remove any entries from state/metadata if their audio file is missing from Dropbox."""
@@ -257,7 +290,7 @@ async def get_stats():
     
     return {
         "total_sentences": len(sentences),
-        "recorded_count": len(recorded),
+        "recorded_count": count_total_recordings(),
         "remaining_count": len(sentences) - len(recorded),
         "progress_percent": round((len(recorded) / len(sentences) * 100), 2) if sentences else 0
     }

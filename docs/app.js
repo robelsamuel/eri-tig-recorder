@@ -17,6 +17,9 @@ let currentSentence = null;
 let recordedBlob = null;
 let recordingMimeType = 'audio/webm'; // Store the actual mime type used
 let speakerName = null; // Store speaker name
+let recordingTimer = null; // Timer for max recording duration
+let recordingStartTime = null; // Track recording start time
+const MAX_RECORDING_DURATION = 20000; // 20 seconds in milliseconds
 
 // DOM Elements
 const sentenceText = document.getElementById('sentenceText');
@@ -261,6 +264,18 @@ async function startRecording() {
         mediaRecorder.start();
         console.log('🔴 Recording started, state:', mediaRecorder.state);
         
+        // Track recording start time
+        recordingStartTime = Date.now();
+        
+        // Set automatic stop timer (20 seconds max)
+        recordingTimer = setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                console.log('⏱️ Maximum recording duration reached (20 seconds) - auto-stopping');
+                stopRecording();
+                showStatus('⏱️ Recording stopped automatically (20 second limit reached). Listen and submit if good, or record again.', 'success');
+            }
+        }, MAX_RECORDING_DURATION);
+        
         // Update UI
         recordBtn.disabled = true;
         stopBtn.disabled = false;
@@ -269,7 +284,7 @@ async function startRecording() {
         audioPlaybackSection.style.display = 'none';
         
         document.querySelector('.sentence-display').classList.add('recording');
-        showStatus('🔴 Recording... Speak clearly!', 'recording');
+        showStatus('🔴 Recording... Speak clearly! (Max 20 seconds)', 'recording');
         
     } catch (error) {
         console.error('❌ Error starting recording:', error);
@@ -285,8 +300,19 @@ async function startRecording() {
 
 // Stop recording
 function stopRecording() {
+    // Clear the auto-stop timer
+    if (recordingTimer) {
+        clearTimeout(recordingTimer);
+        recordingTimer = null;
+    }
+    
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         console.log('⏹️ Stopping recording...');
+        
+        // Calculate recording duration
+        const duration = recordingStartTime ? Date.now() - recordingStartTime : 0;
+        console.log(`Recording duration: ${(duration / 1000).toFixed(1)} seconds`);
+        
         mediaRecorder.stop();
         
         // Update UI
@@ -295,7 +321,14 @@ function stopRecording() {
         skipBtn.disabled = false;
         
         document.querySelector('.sentence-display').classList.remove('recording');
-        showStatus('✅ Recording stopped! Listen and submit if good, or record again.', 'success');
+        
+        // Show duration in status message
+        if (duration > 0) {
+            const durationText = `${(duration / 1000).toFixed(1)} seconds`;
+            showStatus(`✅ Recording stopped! (Duration: ${durationText}) Listen and submit if good, or record again.`, 'success');
+        } else {
+            showStatus('✅ Recording stopped! Listen and submit if good, or record again.', 'success');
+        }
     } else {
         console.warn('⚠️ MediaRecorder not active, state:', mediaRecorder ? mediaRecorder.state : 'null');
     }
