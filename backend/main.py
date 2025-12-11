@@ -443,8 +443,9 @@ async def submit_recording(
         # Generate unique filename
         timestamp = int(time.time())
         random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
-        state = load_state()
-        sentence_num = len(state.get("recorded", [])) + 1
+        
+        # Use metadata.csv count for sentence number (source of truth for total recordings)
+        sentence_num = count_total_recordings() + 1
         
         # Sanitize speaker name for filename (remove special characters)
         speaker_prefix = ""
