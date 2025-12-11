@@ -351,7 +351,12 @@ async function submitRecording() {
     try {
         console.log('📤 Submitting recording...', recordedBlob.size, 'bytes');
         showStatus('Uploading recording...', 'recording');
+        
+        // Disable ALL buttons during upload to prevent any interaction
         submitBtn.disabled = true;
+        recordBtn.disabled = true;
+        stopBtn.disabled = true;
+        skipBtn.disabled = true;
         
         // Create form data
         const formData = new FormData();
@@ -381,14 +386,22 @@ async function submitRecording() {
             }, 1500);
         } else {
             console.error('❌ Server returned error:', result);
-            showStatus('Error saving recording', 'error');
+            showStatus('Error saving recording. Please try again.', 'error');
+            
+            // Re-enable buttons on error so user can try again
             submitBtn.disabled = false;
+            recordBtn.disabled = false;
+            skipBtn.disabled = false;
         }
         
     } catch (error) {
         console.error('❌ Error submitting recording:', error);
         showStatus('Error submitting recording. Please try again.', 'error');
+        
+        // Re-enable buttons on error so user can try again or re-record
         submitBtn.disabled = false;
+        recordBtn.disabled = false;
+        skipBtn.disabled = false;
     }
 }
 
