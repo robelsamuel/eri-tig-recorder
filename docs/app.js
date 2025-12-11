@@ -56,10 +56,47 @@ const changeNameBtn = document.getElementById('changeNameBtn');
 // Initialize app
 async function init() {
     loadSpeakerName();
+    await checkSystemHealth(); // Check Dropbox connection first
     await loadStats();
     await loadNextSentence();
     setupEventListeners();
     updateRecordingControlsState();
+}
+
+// Check system health (Dropbox connection)
+async function checkSystemHealth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        const health = await response.json();
+        
+        if (health.status === 'unavailable' || !health.dropbox_connected) {
+            showStatus('⚠️ System unavailable: Dropbox connection failed. Recording is disabled. Please try again later.', 'error');
+            disableAllRecordingFeatures();
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error checking system health:', error);
+        showStatus('⚠️ Cannot connect to server. Please check your connection and try again later.', 'error');
+        disableAllRecordingFeatures();
+        return false;
+    }
+}
+
+// Disable all recording features when system is unavailable
+function disableAllRecordingFeatures() {
+    recordBtn.disabled = true;
+    stopBtn.disabled = true;
+    submitBtn.disabled = true;
+    skipBtn.disabled = true;
+    
+    recordBtn.style.opacity = '0.5';
+    recordBtn.style.cursor = 'not-allowed';
+    recordBtn.title = 'System unavailable - Dropbox connection failed';
+    
+    skipBtn.style.opacity = '0.5';
+    skipBtn.style.cursor = 'not-allowed';
 }
 
 // Setup event listeners

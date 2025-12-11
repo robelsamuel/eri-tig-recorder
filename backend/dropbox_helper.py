@@ -98,8 +98,11 @@ class DropboxUploader:
         except ApiError as e:
             if e.error.is_path():
                 return False
-            raise
-        except Exception:
+            # Log other API errors but don't crash
+            print(f"⚠️ Dropbox API error checking {dropbox_filename}: {e}")
+            return False
+        except Exception as e:
+            print(f"⚠️ Error checking file existence for {dropbox_filename}: {e}")
             return False
     
     def get_audio_files(self):

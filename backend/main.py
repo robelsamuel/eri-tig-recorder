@@ -281,6 +281,22 @@ async def startup_event():
 async def root():
     return {"message": "Tigrigna Speech Collection API", "version": "1.0"}
 
+@app.get("/health")
+async def health_check():
+    """Check if the system is ready to accept recordings"""
+    if not DROPBOX_ENABLED:
+        return {
+            "status": "unavailable",
+            "message": "Dropbox connection is not available. Recording is disabled.",
+            "dropbox_connected": False
+        }
+    
+    return {
+        "status": "ready",
+        "message": "System is ready to accept recordings",
+        "dropbox_connected": True
+    }
+
 @app.get("/stats")
 async def get_stats():
     """Get recording statistics"""
@@ -417,6 +433,13 @@ async def submit_recording(
     """Save audio recording and update metadata"""
     temp_path = None
     try:
+        # CHECK DROPBOX CONNECTION FIRST - Block recording if Dropbox is not available
+        if not DROPBOX_ENABLED:
+            raise HTTPException(
+                status_code=503,
+                detail="Dropbox connection is unavailable. Recording is disabled. Please try again later."
+            )
+        
         # Validate speaker name format (backend validation as extra safety)
         if speaker:
             # Check for invalid characters
