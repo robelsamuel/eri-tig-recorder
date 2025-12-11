@@ -447,6 +447,9 @@ async def submit_recording(
         # Use metadata.csv count for sentence number (source of truth for total recordings)
         sentence_num = count_total_recordings() + 1
         
+        # Load state for later use
+        state = load_state()
+        
         # Sanitize speaker name for filename (remove special characters)
         speaker_prefix = ""
         if speaker:
@@ -528,8 +531,14 @@ async def submit_recording(
                 # Also upload the updated sentence_state.json
                 dropbox_uploader.upload_file(STATE_FILE)
                 print(f"✅ Uploaded sentence_state.json to Dropbox")
+                
+                # Clean up local audio file after successful upload to save disk space
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    print(f"🗑️ Cleaned up local file: {filename}")
             except Exception as e:
                 print(f"⚠️ Failed to upload to Dropbox: {e}")
+                # Don't delete the file if upload failed
         
         return {
             "success": True,
