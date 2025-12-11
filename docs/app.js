@@ -56,6 +56,7 @@ async function init() {
     await loadStats();
     await loadNextSentence();
     setupEventListeners();
+    updateRecordingControlsState();
 }
 
 // Setup event listeners
@@ -171,6 +172,15 @@ async function loadNextSentence() {
 
 // Start recording
 async function startRecording() {
+    // Force username input before recording
+    if (!speakerName) {
+        showStatus('❌ Please enter your name before recording!', 'error');
+        speakerNameInput.focus();
+        // Scroll to the speaker name section
+        document.getElementById('speakerNameSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+    
     try {
         console.log('🎙️ Starting recording...');
         
@@ -293,6 +303,12 @@ function stopRecording() {
 
 // Submit recording
 async function submitRecording() {
+    if (!speakerName) {
+        showStatus('❌ Please enter your name before submitting!', 'error');
+        speakerNameInput.focus();
+        return;
+    }
+    
     if (!recordedBlob || !currentSentence) {
         console.error('❌ No recording or sentence to submit');
         showStatus('No recording to submit', 'error');
@@ -385,11 +401,13 @@ function loadSpeakerName() {
         
         // Load personal stats for the saved speaker
         loadPersonalStats();
+        updateRecordingControlsState();
     } else {
         currentSpeakerName.style.display = 'none';
         speakerNameInput.style.display = 'block';
         saveNameBtn.style.display = 'block';
         personalStatsContainer.style.display = 'none';
+        disableRecordingControls();
     }
 }
 
@@ -399,6 +417,7 @@ async function saveSpeakerName() {
     
     if (!name) {
         showStatus('Please enter a valid name.', 'error');
+        speakerNameInput.focus();
         return;
     }
     
@@ -409,22 +428,26 @@ async function saveSpeakerName() {
     
     if (hasSpaces) {
         showStatus('❌ Name cannot contain spaces. Use underscores instead (e.g., "John_Doe")', 'error');
+        speakerNameInput.focus();
         return;
     }
     
     if (hasHyphens) {
         showStatus('❌ Name cannot contain hyphens. Use underscores instead (e.g., "John_Doe")', 'error');
+        speakerNameInput.focus();
         return;
     }
     
     if (hasSpecialChars) {
         showStatus('❌ Name can only contain letters, numbers, and underscores (e.g., "Robel_123")', 'error');
+        speakerNameInput.focus();
         return;
     }
     
     // Check for minimum length
     if (name.length < 2) {
         showStatus('❌ Name must be at least 2 characters long', 'error');
+        speakerNameInput.focus();
         return;
     }
     
@@ -450,6 +473,7 @@ async function saveSpeakerName() {
             
             if (!confirmResume) {
                 showStatus(`❌ Name "${name}" is taken. Please choose a different name.`, 'error');
+                speakerNameInput.focus();
                 return;
             }
             
@@ -470,6 +494,9 @@ async function saveSpeakerName() {
         speakerNameInput.style.display = 'none';
         saveNameBtn.style.display = 'none';
         
+        // Enable recording controls
+        updateRecordingControlsState();
+        
         // Load personal stats after setting name
         await loadPersonalStats();
         
@@ -486,6 +513,9 @@ async function saveSpeakerName() {
         saveNameBtn.style.display = 'none';
         showStatus(`✅ Recording as: ${speakerName}`, 'success');
         
+        // Enable recording controls
+        updateRecordingControlsState();
+        
         await loadPersonalStats();
         setTimeout(hideStatus, 2000);
     }
@@ -498,6 +528,35 @@ function enableNameEditing() {
     speakerNameInput.style.display = 'block';
     saveNameBtn.style.display = 'block';
     speakerNameInput.focus();
+    
+    // Disable recording controls while editing name
+    disableRecordingControls();
+}
+
+// Disable recording controls when no speaker name is set
+function disableRecordingControls() {
+    recordBtn.disabled = true;
+    recordBtn.style.opacity = '0.5';
+    recordBtn.style.cursor = 'not-allowed';
+    recordBtn.title = 'Please enter your name first';
+    
+    stopBtn.disabled = true;
+    submitBtn.disabled = true;
+    skipBtn.disabled = true;
+}
+
+// Enable recording controls when speaker name is set
+function updateRecordingControlsState() {
+    if (speakerName) {
+        recordBtn.disabled = false;
+        recordBtn.style.opacity = '1';
+        recordBtn.style.cursor = 'pointer';
+        recordBtn.title = '';
+        
+        skipBtn.disabled = false;
+    } else {
+        disableRecordingControls();
+    }
 }
 
 // Initialize app when DOM is ready
